@@ -1,0 +1,81 @@
+.kb-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--big-gap);
+  padding: var(--default-padding) var(--big-padding);
+  border-bottom: 1px solid var(--surface-border);
+  background: var(--surface-card);
+  flex-wrap: wrap;
+}
+
+.kb-topbar-search {
+  display: flex;
+  align-items: center;
+  gap: var(--small-gap);
+  flex: 1;
+  min-width: 20rem;
+}
+
+/* Search field: icon sits inside the padded input, never overlapping text. */
+.kb-search-field {
+  position: relative;
+  flex: 1;
+}
+
+.kb-search-icon {
+  position: absolute;
+  left: var(--big-padding);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-color-secondary);
+  pointer-events: none;
+}
+
+.kb-search-input {
+  width: 100%;
+  /* Reserve room on the left for the icon so the caret/text clears it. */
+  padding-left: calc(var(--big-padding) + 1.25rem);
+}
+
+.kb-topbar-usage {
+  display: flex;
+  align-items: center;
+  gap: var(--big-gap);
+}
+
+.kb-usage {
+  display: flex;
+  align-items: center;
+  gap: var(--small-gap);
+  font-size: 0.85rem;
+}
+
+.kb-usage-label {
+  color: var(--text-color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.kb-usage-cost {
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.kb-usage-tok {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  color: var(--text-color-secondary);
+}
+
+.kb-usage-tok .pi {
+  font-size: 0.7rem;
+}
+
+.kb-usage-reset {
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+}

@@ -1,0 +1,95 @@
+:root {
+  /* Spacing scale — single source of truth for all padding/gap. */
+  --small-padding: 0.25rem;
+  --default-padding: 0.5rem;
+  --big-padding: 1rem;
+  --content-padding: 1.5rem;
+  --card-padding: var(--big-padding);
+
+  --small-gap: 0.5rem;
+  --default-gap: 1rem;
+  --big-gap: 1.5rem;
+
+  --custom-border-radius: 0.5rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--surface-ground);
+  color: var(--text-color);
+}
+
+/* Thin, theme-aware scrollbars. */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--surface-400);
+  border-radius: var(--custom-border-radius);
+}
+
+/* Markdown rendering surface. */
+.md-body {
+  line-height: 1.6;
+}
+.md-body h1,
+.md-body h2,
+.md-body h3 {
+  margin: var(--big-padding) 0 var(--default-padding);
+  line-height: 1.25;
+}
+.md-body h2 {
+  font-size: 1.15rem;
+  border-bottom: 1px solid var(--surface-border);
+  padding-bottom: var(--small-padding);
+}
+.md-body h3 {
+  font-size: 1.02rem;
+}
+.md-body p {
+  margin: 0 0 var(--default-padding);
+}
+.md-body ul,
+.md-body ol {
+  margin: 0 0 var(--default-padding);
+  padding-left: var(--content-padding);
+}
+.md-body code {
+  background: var(--surface-100);
+  padding: 0.1em 0.35em;
+  border-radius: var(--custom-border-radius);
+  font-size: 0.9em;
+}
+.md-body pre {
+  background: var(--surface-100);
+  padding: var(--big-padding);
+  border-radius: var(--custom-border-radius);
+  overflow-x: auto;
+}
+.md-body pre code {
+  background: none;
+  padding: 0;
+}
+.md-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 var(--default-padding);
+}
+.md-body th,
+.md-body td {
+  border: 1px solid var(--surface-border);
+  padding: var(--default-padding);
+  text-align: left;
+}

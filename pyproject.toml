@@ -1,0 +1,88 @@
+[project]
+name = "strut-calc-repo-knowledge"
+version = "0.1.0"
+description = "Master knowledge engine: local semantic code search over the CAE repos. Chunks source, embeds with Bedrock Titan v2, stores in sqlite-vec, serves via MCP and a strands-compose agent."
+requires-python = "==3.13.*"
+
+dependencies = [
+    "boto3>=1.35.0",
+    "sqlite-vec>=0.1.6",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
+    "python-dotenv>=1.0.1",
+    "strands-compose-agentcore>=0.10.0",
+    "strands-compose>=0.11.2",
+    "strands-agents>=1.52.0",
+    # Pin to v1: mcp 2.x renamed FastMCP -> MCPServer and changed the import
+    # paths, and strands-compose 0.11 (plus this code) is written against the v1
+    # API. Lift the pin only when strands-compose supports mcp 2.x.
+    "mcp[cli]>=1.2.0,<2",
+    # Web app (goal: a small search UI over the agents).
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+]
+
+[dependency-groups]
+check = [
+    "bandit>=1.9.4",
+    "mypy>=1.13.0",
+    "ruff>=0.15.0",
+    "rust-just>=1.50.0",
+    "pytest>=8.4.0",
+    "boto3-stubs[bedrock-runtime]>=1.35.0",
+]
+
+[tool.bandit]
+targets = ["src", "app"]
+severity = "all"
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "app"]
+python_files = ["test_*.py"]
+testpaths = ["tests"]
+addopts = "--verbosity=2"
+
+[tool.ruff]
+fix = false
+indent-width = 4
+line-length = 100
+target-version = "py313"
+src = ["src", "app", "tests"]
+exclude = ["__pycache__", "*.pyc"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # import order
+    "D",    # pydocstyle (google)
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "G",    # logging format (no f-strings in log calls)
+    "ANN",  # type annotations
+    "C90",  # mccabe complexity
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["D100", "D103", "D104", "ANN401"]
+
+[tool.mypy]
+python_version = "3.13"
+packages = ["src", "app"]
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+show_error_codes = true
+
+# These ship no type information, so their attributes read as Any. Silence only
+# the missing-stub errors for them, not the rest of the strict run.
+[[tool.mypy.overrides]]
+module = ["sqlite_vec", "mcp.*", "strands_compose.*", "strands.*"]
+ignore_missing_imports = true

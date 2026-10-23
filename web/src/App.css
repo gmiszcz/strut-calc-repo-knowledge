@@ -1,0 +1,21 @@
+.kb-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.kb-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--default-gap);
+  padding: var(--big-padding);
+  background: var(--surface-ground);
+}
+
+@media (max-width: 60rem) {
+  .kb-main {
+    grid-template-columns: 1fr;
+  }
+}

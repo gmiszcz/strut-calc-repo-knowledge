@@ -1,0 +1,104 @@
+# Two-agent strands-compose config for the knowledge assistant.
+#
+# - `searcher`  — Bedrock Haiku whose only tool is the local semantic-search MCP
+#                 server. Answers "how/why does this work" by searching the
+#                 vector index. Produces a first, evidence-grounded answer fast.
+# - `redactor`  — Bedrock Haiku with no tools. Takes the searcher's answer and
+#                 rewrites it into clean, concise Markdown with headings.
+#
+# No `orchestrations:` block on purpose: the backend invokes the two agents
+# itself (searcher then redactor) so it can stream the searcher's reasoning and
+# the redactor's polished result into two separate UI panels. A delegate router
+# would also have to serialise the searcher's Markdown as JSON tool arguments,
+# which the model rejects.
+
+models:
+  haiku:
+    provider: bedrock
+    model_id: ${REPOMAP_AGENT_MODEL_ID:-eu.anthropic.claude-haiku-5-5}
+    # model_id: ${REPOMAP_AGENT_MODEL_ID:-eu.anthropic.claude-sonnet-5-5}
+    params:
+      max_tokens: 32000
+      cache_prompt: default
+      cache_tools: default
+      additional_request_fields:
+        thinking:
+          type: adaptive
+        output_config:
+          effort: low
+
+# The agent connects to the search engine as an MCP client over stdio. It spawns
+# the same server Kiro launches (`python -m src.server`) as a subprocess, so
+# there is one server implementation. `uv run --directory` makes the command
+# independent of the current working directory. Tools arrive prefixed `kb_`.
+mcp_clients:
+  search_client:
+    command:
+      - uv
+      - run
+      - --directory
+      - d:/Coding/strut-calc-repo-knowledge
+      - python
+      - -m
+      - src.server
+    params:
+      prefix: kb
+
+# File-backed sessions, so a conversation survives a restart. The backend
+# overrides session_id per request (load(..., session_id=...)), so the value
+# here is only a placeholder default.
+session_manager:
+  provider: file
+  params:
+    storage_dir: ./.sessions
+
+agents:
+  searcher:
+    model: haiku
+    mcp:
+      - search_client
+    # Keep the context small: only the last 10 messages ride into each call.
+    conversation_manager:
+      type: strands.agent:SlidingWindowConversationManager
+      params:
+        window_size: 10
+        should_truncate_results: false
+    system_prompt: |
+      You are the StrutCalc codebase assistant. You answer questions about how
+      the CAE applications are built and why, using the kb_search_code tool to
+      find relevant code and documentation by meaning across the indexed repos
+      (strut-calc, cae-ai-agents, cae-engine, strut-calc-v2).
+
+      Rules:
+      - Always call kb_search_code before answering a "how/why/where" question.
+        Do not answer from guesses.
+      - Ground every claim in a returned chunk. Cite the repo, path and line
+        range you relied on (e.g. "strut-calc ui/src/store/formSlice.js L40-88").
+      - If the search returns nothing relevant, say so plainly rather than
+        inventing an answer.
+      - Be concise. Lead with the answer, then the evidence. A quick, readable
+        first pass is fine — a second agent will polish it.
+
+  redactor:
+    model: haiku
+    conversation_manager:
+      type: strands.agent:SlidingWindowConversationManager
+      params:
+        window_size: 10
+        should_truncate_results: false
+    system_prompt: |
+      You are a technical editor. You receive a draft answer about the CAE
+      codebase (already grounded in code by a prior agent) and rewrite it into
+      clean, concise Markdown for a reader.
+
+      Rules:
+      - Output ONLY Markdown — no preamble, no "here is", no commentary.
+      - Use short headings (##), tight bullet lists, and inline `code` for
+        identifiers, paths and endpoints.
+      - Keep every factual claim and every file/line citation from the draft;
+        do not invent new facts and do not drop the evidence.
+      - Lead with the answer in one or two sentences, then the detail.
+      - Cut filler and repetition. Prefer a compact table or 3-5 bullets over
+        prose when it fits.
+
+entry: searcher

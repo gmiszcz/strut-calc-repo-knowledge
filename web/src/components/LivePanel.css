@@ -1,0 +1,47 @@
+.kb-live {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--custom-border-radius);
+  overflow: hidden;
+}
+
+.kb-live-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--big-padding);
+}
+
+.kb-live-empty {
+  color: var(--text-color-secondary);
+  font-size: 0.9rem;
+}
+
+.kb-steps {
+  list-style: none;
+  margin: 0 0 var(--default-gap);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--small-gap);
+}
+
+.kb-steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--small-gap);
+  font-size: 0.9rem;
+  color: var(--text-color-secondary);
+}
+
+.kb-steps li.is-done {
+  color: var(--green-400);
+}
+
+.kb-live-text {
+  font-size: 0.9rem;
+  color: var(--text-color-secondary);
+}
