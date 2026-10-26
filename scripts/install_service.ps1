@@ -5,13 +5,16 @@
 # UI it serves) runs non-stop and restarts on crash or boot. The MCP search
 # server is NOT a service: the backend spawns it on demand (stdio) per request.
 #
-# Note: the backend calls Bedrock, so the AWS SSO session for the account the
-# service runs as must stay valid, or answers return an auth error until the
-# next `aws sso login`.
+# Note: the backend calls Bedrock using the AWS SSO token cached under
+# C:\Users\<user>\.aws. The service MUST run as that same interactive user, or
+# it cannot see the cache and every answer fails auth. It defaults to the
+# TENNECO\patrbato account for this reason. Windows requires the account's
+# password to register a service under a named user; the script prompts for it
+# securely when it is not passed in.
 
 param(
     [string]$ServiceName = "StrutCalcKnowledge",
-    [string]$ServiceUser = "",
+    [string]$ServiceUser = ".\patrbato",
     [string]$ServicePassword = "",
     [int]$Port = 8077,
     [switch]$Uninstall,
@@ -97,10 +100,22 @@ nssm set $ServiceName AppRotateBytes 10485760
 nssm set $ServiceName AppRestartDelay 5000
 nssm set $ServiceName AppThrottle 10000
 
-# Run as a specific user (optional). Running as your own user is recommended so
-# the service inherits your ~/.aws SSO cache and can reach Bedrock.
-if ($ServiceUser -and $ServicePassword) {
+# Run as the interactive user so the service inherits that user's ~/.aws SSO
+# cache and can reach Bedrock. Running as the default LocalSystem account would
+# not see the cache, so refuse that silently-broken path and prompt for the
+# password when it was not supplied.
+if ($ServiceUser) {
+    if (-not $ServicePassword) {
+        $secure = Read-Host "Password for '$ServiceUser' (needed to run the service as this user)" -AsSecureString
+        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+        $ServicePassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+    }
     nssm set $ServiceName ObjectName $ServiceUser $ServicePassword
+    Write-Host "Service will run as '$ServiceUser' (inherits that user's AWS SSO cache)." -ForegroundColor Green
+} else {
+    Write-Host "WARNING: no ServiceUser set. The service will run as LocalSystem and" -ForegroundColor Yellow
+    Write-Host "         will NOT see your AWS SSO cache, so Bedrock calls will fail." -ForegroundColor Yellow
 }
 
 nssm set $ServiceName Start SERVICE_AUTO_START
