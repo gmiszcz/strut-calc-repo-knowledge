@@ -159,7 +159,10 @@ async def ask_stream(req: AskRequest) -> StreamingResponse:
 
     info = get_session_info(session_id)
     if info and info["remaining"] <= 0:
-        raise HTTPException(status_code=429, detail="Session limit reached. Start a new conversation.")
+        raise HTTPException(
+            status_code=429,
+            detail="Session limit reached. Start a new conversation.",
+        )
 
     try:
         searcher, session_info = get_or_create_agent(session_id, "searcher")
@@ -172,71 +175,113 @@ async def ask_stream(req: AskRequest) -> StreamingResponse:
     queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
     timeout = get_web_settings().invocation_timeout_seconds
 
-    def generate() -> Iterator[str]:
-        work_error: list[str | None] = [None]
+    work_error: list[str | None] = [None]
 
-        usage_total: dict[str, int] = {"inputTokens": 0, "outputTokens": 0}
+    def _work() -> None:
+        _run_both_agents(searcher, redactor, question, loop, queue, work_error)
 
-        def _emit(event: dict[str, Any]) -> None:
-            loop.call_soon_threadsafe(queue.put_nowait, event)
-
-        def _add_usage(usage: dict[str, int]) -> None:
-            usage_total["inputTokens"] += usage.get("inputTokens", 0)
-            usage_total["outputTokens"] += usage.get("outputTokens", 0)
-
-        def _work() -> None:
-            try:
-                _emit({"type": "stage_start", "stage": "searcher"})
-                draft, draft_usage = _run_agent_streamed(searcher, question, "searcher", loop, queue)
-                _add_usage(draft_usage)
-                _emit({"type": "stage_complete", "stage": "searcher", "content": draft})
-
-                _emit({"type": "stage_start", "stage": "redactor"})
-                final, final_usage = _run_agent_streamed(
-                    redactor, _REDACT_PROMPT + draft, "redactor", loop, queue
-                )
-                _add_usage(final_usage)
-                _emit({"type": "stage_complete", "stage": "redactor", "content": final})
-            except Exception as exc:  # noqa: BLE001 - surfaced as an error event
-                work_error[0] = str(exc)
-            finally:
-                _emit({"type": "usage", "usage": dict(usage_total)})
-                _emit({"type": "_done"})
-
-        threading.Thread(target=_work, daemon=True).start()
-
-        yield f"data: {json.dumps({'type': 'session', 'session': session_info})}\n\n"
-
-        final_usage = {"inputTokens": 0, "outputTokens": 0}
-        while True:
-            future = asyncio.run_coroutine_threadsafe(queue.get(), loop)
-            try:
-                event = future.result(timeout=timeout)
-            except Exception as exc:  # noqa: BLE001 - timeout or loop error
-                yield f"data: {json.dumps({'type': 'error', 'error': str(exc)})}\n\n"
-                return
-            if event["type"] == "_done":
-                break
-            if event["type"] == "usage":
-                final_usage = event["usage"]
-                continue
-            yield f"data: {json.dumps(event)}\n\n"
-
-        if work_error[0]:
-            yield f"data: {json.dumps({'type': 'error', 'error': work_error[0]})}\n\n"
-            return
-
-        updated = record_exchange(session_id)
-        complete = {"type": "complete", "session": updated, "usage": final_usage}
-        yield f"data: {json.dumps(complete)}\n\n"
-
+    threading.Thread(target=_work, daemon=True).start()
     threading.Thread(target=loop.run_forever, daemon=True).start()
 
+    generator = _sse_generator(loop, queue, timeout, session_info, session_id, work_error)
     return StreamingResponse(
-        generate(),
+        generator,
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+def _run_both_agents(
+    searcher: Any,
+    redactor: Any,
+    question: str,
+    loop: asyncio.AbstractEventLoop,
+    queue: asyncio.Queue[dict[str, Any]],
+    work_error: list[str | None],
+) -> None:
+    """Run searcher then redactor, emitting stage and usage events.
+
+    Args:
+        searcher: The searcher agent.
+        redactor: The redactor agent.
+        question: The user's question.
+        loop: The request event loop.
+        queue: The SSE event queue.
+        work_error: One-element list the error message is written into.
+    """
+    usage_total = {"inputTokens": 0, "outputTokens": 0}
+
+    def emit(event: dict[str, Any]) -> None:
+        loop.call_soon_threadsafe(queue.put_nowait, event)
+
+    def add_usage(usage: dict[str, int]) -> None:
+        usage_total["inputTokens"] += usage.get("inputTokens", 0)
+        usage_total["outputTokens"] += usage.get("outputTokens", 0)
+
+    try:
+        emit({"type": "stage_start", "stage": "searcher"})
+        draft, draft_usage = _run_agent_streamed(searcher, question, "searcher", loop, queue)
+        add_usage(draft_usage)
+        emit({"type": "stage_complete", "stage": "searcher", "content": draft})
+
+        emit({"type": "stage_start", "stage": "redactor"})
+        final, final_usage = _run_agent_streamed(
+            redactor, _REDACT_PROMPT + draft, "redactor", loop, queue
+        )
+        add_usage(final_usage)
+        emit({"type": "stage_complete", "stage": "redactor", "content": final})
+    except Exception as exc:  # noqa: BLE001 - surfaced as an error event
+        work_error[0] = str(exc)
+    finally:
+        emit({"type": "usage", "usage": dict(usage_total)})
+        emit({"type": "_done"})
+
+
+def _sse_generator(
+    loop: asyncio.AbstractEventLoop,
+    queue: asyncio.Queue[dict[str, Any]],
+    timeout: float,
+    session_info: dict[str, Any],
+    session_id: str,
+    work_error: list[str | None],
+) -> Iterator[str]:
+    """Drain the event queue and yield SSE lines until the work is done.
+
+    Args:
+        loop: The request event loop the worker posts events to.
+        queue: The SSE event queue.
+        timeout: Per-event wait ceiling in seconds.
+        session_info: The initial session payload to send first.
+        session_id: The session id, for recording the completed exchange.
+        work_error: Error slot the worker writes a failure message into.
+
+    Yields:
+        ``data: {...}`` SSE lines.
+    """
+    yield f"data: {json.dumps({'type': 'session', 'session': session_info})}\n\n"
+
+    final_usage = {"inputTokens": 0, "outputTokens": 0}
+    while True:
+        future = asyncio.run_coroutine_threadsafe(queue.get(), loop)
+        try:
+            event = future.result(timeout=timeout)
+        except Exception as exc:  # noqa: BLE001 - timeout or loop error
+            yield f"data: {json.dumps({'type': 'error', 'error': str(exc)})}\n\n"
+            return
+        if event["type"] == "_done":
+            break
+        if event["type"] == "usage":
+            final_usage = event["usage"]
+            continue
+        yield f"data: {json.dumps(event)}\n\n"
+
+    if work_error[0]:
+        yield f"data: {json.dumps({'type': 'error', 'error': work_error[0]})}\n\n"
+        return
+
+    updated = record_exchange(session_id)
+    complete = {"type": "complete", "session": updated, "usage": final_usage}
+    yield f"data: {json.dumps(complete)}\n\n"
 
 
 class ResetRequest(BaseModel):

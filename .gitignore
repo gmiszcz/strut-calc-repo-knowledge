@@ -22,6 +22,10 @@ node_modules/
 web/node_modules/
 app/dist/
 
+# Service logs and the bundled NSSM binary
+logs/
+scripts/nssm.exe
+
 # Temporary / scratch files
 _*.out
 _*.err

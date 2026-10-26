@@ -72,6 +72,9 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["D100", "D103", "D104", "ANN401"]
+# The web layer sits on the Strands/compose boundary, which ships no types, so
+# agent objects, their callback kwargs and their results are honestly `Any`.
+"app/**/*.py" = ["ANN401"]
 
 [tool.mypy]
 python_version = "3.13"
