@@ -8,13 +8,14 @@
 # Note: the backend calls Bedrock using the AWS SSO token cached under
 # C:\Users\<user>\.aws. The service MUST run as that same interactive user, or
 # it cannot see the cache and every answer fails auth. It defaults to the
-# TENNECO\patrbato account for this reason. Windows requires the account's
+# domain account EMEA\patrbato (a local ".\patrbato" does not exist, which is
+# why NSSM reported "Failed to look up the SID"). Windows requires the account's
 # password to register a service under a named user; the script prompts for it
 # securely when it is not passed in.
 
 param(
     [string]$ServiceName = "StrutCalcKnowledge",
-    [string]$ServiceUser = ".\patrbato",
+    [string]$ServiceUser = "EMEA\patrbato",
     [string]$ServicePassword = "",
     [int]$Port = 8077,
     [switch]$Uninstall,
@@ -112,6 +113,14 @@ if ($ServiceUser) {
         [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
     }
     nssm set $ServiceName ObjectName $ServiceUser $ServicePassword
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: could not set the service account to '$ServiceUser'." -ForegroundColor Red
+        Write-Host "       The service would run as LocalSystem and fail every Bedrock call." -ForegroundColor Red
+        Write-Host "       Check the account name (domain form, e.g. EMEA\patrbato) and password," -ForegroundColor Red
+        Write-Host "       then re-run. Removing the half-configured service." -ForegroundColor Red
+        try { nssm remove $ServiceName confirm } catch {} 2>$null
+        exit 1
+    }
     Write-Host "Service will run as '$ServiceUser' (inherits that user's AWS SSO cache)." -ForegroundColor Green
 } else {
     Write-Host "WARNING: no ServiceUser set. The service will run as LocalSystem and" -ForegroundColor Yellow
