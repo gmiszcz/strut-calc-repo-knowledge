@@ -153,7 +153,7 @@ class VectorStore:
             chunk: The chunk metadata and text.
             embedding: The chunk's embedding vector.
         """
-        cursor = self._conn.execute(
+        self._conn.execute(
             """
             INSERT INTO chunks
                 (chunk_id, repo, path, lang, kind, symbol, start_line, end_line,
@@ -178,14 +178,20 @@ class VectorStore:
                 chunk.text,
             ),
         )
-        rowid = cursor.lastrowid
-        if rowid is None:
-            row = self._conn.execute(
-                "SELECT rowid FROM chunks WHERE chunk_id = ?", (chunk.chunk_id,)
-            ).fetchone()
-            rowid = int(row[0])
+        # cursor.lastrowid is unreliable on the ON CONFLICT ... DO UPDATE path:
+        # SQLite can report the rowid of the attempted insert rather than the
+        # existing row, which then collides in vec_chunks. Read the authoritative
+        # rowid back by chunk_id instead — correct for both insert and update.
+        row = self._conn.execute(
+            "SELECT rowid FROM chunks WHERE chunk_id = ?", (chunk.chunk_id,)
+        ).fetchone()
+        rowid = int(row[0])
+        # vec0 virtual tables do not honour INSERT OR REPLACE: replacing a row at
+        # an existing rowid raises a UNIQUE constraint error instead of swapping
+        # the vector. Delete the old vector first, then insert the new one.
+        self._conn.execute("DELETE FROM vec_chunks WHERE rowid = ?", (rowid,))
         self._conn.execute(
-            "INSERT OR REPLACE INTO vec_chunks(rowid, embedding) VALUES (?, ?)",
+            "INSERT INTO vec_chunks(rowid, embedding) VALUES (?, ?)",
             (rowid, _pack(embedding)),
         )
 
