@@ -15,6 +15,7 @@ import {
   askFailed,
   newSession,
 } from "@store";
+import { buildPrompt } from "@utils/promptHints";
 import TopBar from "@components/TopBar";
 import ChatPanel from "@components/ChatPanel";
 import LivePanel from "@components/LivePanel";
@@ -25,6 +26,7 @@ export default function App() {
   const query = useSelector((s) => s.knowledge.query);
   const sessionId = useSelector((s) => s.knowledge.sessionId);
   const streaming = useSelector((s) => s.knowledge.streaming);
+  const settings = useSelector((s) => s.knowledge.settings);
   const abortRef = useRef(null);
 
   useEffect(() => () => abortRef.current?.(), []);
@@ -35,7 +37,7 @@ export default function App() {
     dispatch(askStarted(q));
 
     abortRef.current = streamAsk({
-      question: q,
+      question: buildPrompt(q, settings),
       sessionId,
       onEvent: (event) => {
         switch (event.type) {

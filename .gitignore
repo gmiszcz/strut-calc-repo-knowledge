@@ -14,8 +14,9 @@ __pycache__/
 *.db-*
 .embed_manifest.json
 
-# Agent conversation sessions (file session manager)
+# Agent conversation sessions (file session manager) and saved history
 .sessions/
+.history/
 
 # Frontend
 node_modules/

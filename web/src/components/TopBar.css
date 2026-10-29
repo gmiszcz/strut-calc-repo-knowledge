@@ -79,3 +79,35 @@
   width: 1.75rem !important;
   height: 1.75rem !important;
 }
+
+.kb-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--default-padding);
+  max-width: 20rem;
+}
+
+.kb-settings-title {
+  color: var(--text-color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.kb-settings-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--small-gap);
+}
+
+.kb-settings-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  cursor: pointer;
+}
+
+.kb-settings-label small {
+  color: var(--text-color-secondary);
+}

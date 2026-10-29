@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.ai_router import router as ai_router
 from app.config import get_web_settings
+from app.history import router as history_router
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +35,11 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "DELETE"],
         allow_headers=["Content-Type"],
     )
     app.include_router(ai_router, prefix="/api")
+    app.include_router(history_router, prefix="/api")
 
     @app.get("/api/health")
     def health() -> dict[str, str]:

@@ -30,6 +30,48 @@ function saveGlobal(usage) {
   }
 }
 
+const SETTINGS_KEY = "kb.answerSettings.v1";
+
+// Answer-style toggles injected into the prompt. Each key maps to its opposite,
+// so at most one of each pair is on.
+const DEFAULT_SETTINGS = {
+  shortAnswers: false,
+  detailedVerification: false,
+  consolidated: false,
+  perRepo: false,
+};
+
+const OPPOSITE_SETTING = {
+  shortAnswers: "detailedVerification",
+  detailedVerification: "shortAnswers",
+  consolidated: "perRepo",
+  perRepo: "consolidated",
+};
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return { ...DEFAULT_SETTINGS };
+    const v = JSON.parse(raw);
+    return {
+      shortAnswers: !!v.shortAnswers,
+      detailedVerification: !!v.detailedVerification && !v.shortAnswers,
+      consolidated: !!v.consolidated,
+      perRepo: !!v.perRepo && !v.consolidated,
+    };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function saveSettings(settings) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    // localStorage unavailable — settings only last for this page load.
+  }
+}
+
 // A chat turn. `answer` is the redactor's polished Markdown; `reasoning` and
 // `live` are the searcher's working stream for that turn.
 function newTurn(question) {
@@ -52,6 +94,8 @@ const initialState = {
   turns: [], // chat history (left panel)
   sessionUsage: { inputTokens: 0, outputTokens: 0 }, // this session only
   globalUsage: loadGlobal(), // persisted, resettable
+  settings: loadSettings(), // persisted answer-style toggles
+  savedTitle: null, // title when the current session is saved to history
 };
 
 const knowledgeSlice = createSlice({
@@ -136,10 +180,36 @@ const knowledgeSlice = createSlice({
       state.error = null;
       state.turns = [];
       state.sessionUsage = { inputTokens: 0, outputTokens: 0 };
+      state.savedTitle = null;
+    },
+    sessionSaved(state, action) {
+      state.savedTitle = action.payload;
+    },
+    sessionRestored(state, action) {
+      const { id, title, turns = [], sessionUsage = {} } = action.payload;
+      state.sessionId = id;
+      state.query = "";
+      state.streaming = false;
+      state.stage = null;
+      state.error = null;
+      state.turns = turns.map((t) => ({ ...t, reasoning: t.reasoning || [], streaming: false }));
+      state.sessionUsage = {
+        inputTokens: sessionUsage.inputTokens || 0,
+        outputTokens: sessionUsage.outputTokens || 0,
+      };
+      state.savedTitle = title;
     },
     resetGlobalUsage(state) {
       state.globalUsage = { inputTokens: 0, outputTokens: 0 };
       saveGlobal(state.globalUsage);
+    },
+    setSetting(state, action) {
+      const { key, value } = action.payload;
+      if (!(key in DEFAULT_SETTINGS)) return;
+      state.settings[key] = !!value;
+      // Enabling a setting disables its opposite.
+      if (value) state.settings[OPPOSITE_SETTING[key]] = false;
+      saveSettings(state.settings);
     },
   },
 });
@@ -159,6 +229,9 @@ export const {
   askFailed,
   newSession,
   resetGlobalUsage,
+  setSetting,
+  sessionSaved,
+  sessionRestored,
 } = knowledgeSlice.actions;
 
 export default knowledgeSlice.reducer;
