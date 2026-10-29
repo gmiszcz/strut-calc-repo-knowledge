@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 _SYSTEM_PROMPT = (
     "You name saved conversations about a CAE codebase. Reply with ONLY a short, "
     "specific title of 3 to 8 words that describes the topic. No quotes, no "
-    "trailing punctuation, no prefix like 'Title:'. Use the language of the "
-    "user's questions."
+    "trailing punctuation, no prefix like 'Title:'. Always write the title in "
+    "English, even when the conversation is in another language."
 )
 
 # Per-turn text limits keep the title request small and cheap.

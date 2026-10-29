@@ -128,6 +128,7 @@ export default function HistoryControls() {
         onHide={() => setOpen(false)}
         header="Saved conversations"
         className="kb-history"
+        style={{ width: "min(32rem, 90vw)" }}
       >
         {loading && <ProgressBar mode="indeterminate" style={{ height: 3 }} />}
         {!loading && items.length === 0 && (
@@ -143,7 +144,7 @@ export default function HistoryControls() {
                 type="button"
                 className="kb-history-open"
                 onClick={() => onRestore(item.id)}
-                title="Open this conversation"
+                title={item.title}
               >
                 <span className="kb-history-title">{item.title}</span>
                 <small className="kb-history-meta">

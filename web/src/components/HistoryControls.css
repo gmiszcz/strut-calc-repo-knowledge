@@ -1,7 +1,3 @@
-.kb-history.p-sidebar {
-  width: 24rem;
-}
-
 .kb-history-empty {
   color: var(--text-color-secondary);
 }
@@ -49,13 +45,19 @@
   background: var(--surface-hover);
 }
 
+/* Wrap long titles onto up to two lines instead of cutting them off. */
 .kb-history-title {
+  font-size: 0.85rem;
   font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .kb-history-meta {
+  font-size: 0.75rem;
   color: var(--text-color-secondary);
 }
